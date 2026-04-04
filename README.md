@@ -33,14 +33,14 @@ MeowAuth is a server-side authentication mod that provides a secure token-based 
 #### Server
 
 1. Install **Minecraft Forge 1.20.1**
-2. Download `MeowAuth-Server-2.0.0.jar` from [Releases](https://github.com/Jun1devs/MeowAuth/releases)
+2. Download `MeowAuth-Server-2.0.0.jar` from [Releases](https://github.com/Jun1devs/MeowAuth-v2/releases)
 3. Place the file in your server's `mods/` folder
 4. Start the server — configuration will be created automatically
 
 #### Client (Players)
 
 1. Install **Minecraft Forge 1.20.1**
-2. Download `MeowAuth-Client-2.0.0.jar` from [Releases](https://github.com/Jun1devs/MeowAuth/releases)
+2. Download `MeowAuth-Client-2.0.0.jar` from [Releases](https://github.com/Jun1devs/MeowAuth-v2/releases)
 3. Place the file in your `mods/` folder
 4. Launch Minecraft — token is saved and sent automatically on join
 
@@ -140,14 +140,14 @@ MeowAuth — мод серверной авторизации для Minecraft �
 #### Сервер
 
 1. Установите **Minecraft Forge 1.20.1**
-2. Скачайте `MeowAuth-Server-2.0.0.jar` из [Releases](https://github.com/Jun1devs/MeowAuth/releases)
+2. Скачайте `MeowAuth-Server-2.0.0.jar` из [Releases](https://github.com/Jun1devs/MeowAuth-v2/releases)
 3. Поместите файл в папку `mods/` на сервере
 4. Запустите сервер — конфигурация создастся автоматически
 
 #### Клиент (Игроки)
 
 1. Установите **Minecraft Forge 1.20.1**
-2. Скачайте `MeowAuth-Client-2.0.0.jar` из [Releases](https://github.com/Jun1devs/MeowAuth/releases)
+2. Скачайте `MeowAuth-Client-2.0.0.jar` из [Releases](https://github.com/Jun1devs/MeowAuth-v2/releases)
 3. Поместите файл в папку `mods/`
 4. Запустите Minecraft — токен сохранится и отправится автоматически при подключении
 
