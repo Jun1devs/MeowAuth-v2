@@ -41,7 +41,7 @@ dependencies {
 
     implementation project(':meowauth-common')
 
-    embeddedLib 'com.google.code.gson:gson:2.13.2'
+    implementation 'com.google.code.gson:gson:2.13.2'
 
     // Guava
     implementation "com.google.guava:guava:${guava_version}"
