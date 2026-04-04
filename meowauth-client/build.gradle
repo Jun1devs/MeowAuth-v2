@@ -69,6 +69,10 @@ processResources {
 }
 
 jar {
+
+    from project(':meowauth-common').sourceSets.main.output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
     manifest {
         attributes([
                 'Specification-Title'   : mod_name + ' Client',

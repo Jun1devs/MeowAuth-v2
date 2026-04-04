@@ -1,8 +1,0 @@
-modLoader="javafml"
-loaderVersion="[47,)"
-license="MIT"
-[[mods]]
-modId="meowauth_common"
-version="1.0.0"
-displayName="MeowAuth Common"
-description="Common library for MeowAuth"
