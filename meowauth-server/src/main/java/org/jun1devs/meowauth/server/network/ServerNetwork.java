@@ -18,8 +18,11 @@ import org.slf4j.LoggerFactory;
 import java.util.function.Supplier;
 
 public class ServerNetwork {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerNetwork.class);
+
+    private ServerNetwork() {
+        // Utility class, no instances
+    }
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
             .named(NetworkConstants.CHANNEL_NAME)
@@ -29,22 +32,18 @@ public class ServerNetwork {
             .simpleChannel();
 
     public static void register() {
-        LOGGER.info("Registering server network channels");
+        LOGGER.info("Registering server network channels (STRICT MODE)");
 
-        // C2S: клиент -> сервер (проверка токена)
         CHANNEL.messageBuilder(TokenC2SPacket.class, NetworkConstants.C2S_TOKEN_PACKET_ID)
                 .encoder(TokenC2SPacket::encode)
                 .decoder(TokenC2SPacket::decode)
                 .consumerMainThread(ServerNetwork::handleTokenC2S)
                 .add();
 
-        // S2C: сервер -> клиент (доставка токена)
         CHANNEL.messageBuilder(TokenS2CPacket.class, NetworkConstants.S2C_TOKEN_PACKET_ID)
                 .encoder(TokenS2CPacket::encode)
                 .decoder(TokenS2CPacket::decode)
-                .consumerMainThread((pkt, ctxSupplier) -> {
-                    ctxSupplier.get().setPacketHandled(true);
-                })
+                .consumerMainThread((pkt, ctxSupplier) -> ctxSupplier.get().setPacketHandled(true))
                 .add();
     }
 
@@ -57,26 +56,38 @@ public class ServerNetwork {
             String username = pkt.getUsername();
             String token = pkt.getToken();
 
+            // 1. Проверка на блокировку после частых ошибок
             if (PlayerJoinHandler.isLockedOut(username)) {
-                sender.connection.disconnect(
-                        Component.literal("§cToo many failed attempts. Try again later."));
+                sender.connection.disconnect(Component.literal("§cToo many failed attempts. Contact an admin."));
                 return;
             }
 
-            boolean valid = UserDataManager.verifyToken(username, token);
-            if (!valid) {
-                PlayerJoinHandler.recordFailedAttempt(username);
-                sender.connection.disconnect(Component.literal(ConfigManager.kickMessage));
-                LOGGER.warn("Player '{}' failed token auth", username);
-            } else {
+            // 2. Если токен верный -> разрешаем вход
+            if (UserDataManager.verifyToken(username, token)) {
                 PlayerJoinHandler.resetAttempts(username);
                 LOGGER.info("Player '{}' authenticated successfully", username);
+                return;
             }
+
+            // 3. Токен неверный или отсутствует
+            boolean isRegistered = UserDataManager.isRegistered(username);
+
+            if (!isRegistered) {
+                // Игрок НОВЫЙ -> регистрируем и выдаём токен
+                String newToken = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
+                ServerNetwork.sendTokenToClient(sender, newToken);
+                LOGGER.info("New player '{}' registered and issued token automatically.", username);
+                return;
+            }
+
+            // Игрок СТАРЫЙ, но токен не совпал -> кик
+            PlayerJoinHandler.recordFailedAttempt(username);
+            sender.connection.disconnect(Component.literal(ConfigManager.getKickMessage()));
+            LOGGER.warn("Player '{}' kicked: invalid token (Strict Mode)", username);
         });
         ctx.setPacketHandled(true);
     }
 
-    /** Отправить токен конкретному игроку. */
     public static void sendTokenToClient(ServerPlayer player, String token) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new TokenS2CPacket(token));
     }

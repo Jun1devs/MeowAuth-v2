@@ -21,6 +21,11 @@ public class TokenReceiver {
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenReceiver.class);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path TOKEN_FILE = Path.of("config/meowauth-client.json");
+    private static final String KEY_TOKEN = "token";
+
+    private TokenReceiver() {
+        // Utility class, no instances
+    }
 
     private static String cachedToken = null;
 
@@ -34,7 +39,7 @@ public class TokenReceiver {
         try {
             Files.createDirectories(TOKEN_FILE.getParent());
             JsonObject json = new JsonObject();
-            json.addProperty("token", token);
+            json.addProperty(KEY_TOKEN, token);
             json.addProperty("savedAt", System.currentTimeMillis());
             try (Writer writer = Files.newBufferedWriter(TOKEN_FILE)) {
                 GSON.toJson(json, writer);
@@ -58,8 +63,8 @@ public class TokenReceiver {
             }
             try (Reader reader = Files.newBufferedReader(TOKEN_FILE)) {
                 JsonObject json = GSON.fromJson(reader, JsonObject.class);
-                if (json != null && json.has("token")) {
-                    cachedToken = json.get("token").getAsString();
+                if (json != null && json.has(KEY_TOKEN)) {
+                    cachedToken = json.get(KEY_TOKEN).getAsString();
                     LOGGER.debug("Token loaded from {}", TOKEN_FILE);
                     return cachedToken;
                 }

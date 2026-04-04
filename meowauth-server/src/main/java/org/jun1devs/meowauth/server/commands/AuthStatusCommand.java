@@ -15,6 +15,10 @@ import org.jun1devs.meowauth.server.events.PlayerJoinHandler;
  */
 public class AuthStatusCommand {
 
+    private AuthStatusCommand() {
+        // Utility class, no instances
+    }
+
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("authstatus")
                 .executes(AuthStatusCommand::run)

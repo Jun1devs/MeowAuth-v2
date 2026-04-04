@@ -26,6 +26,10 @@ import java.util.concurrent.TimeUnit;
  */
 public class UserDataManager {
 
+    private UserDataManager() {
+        // Utility class, no instances
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDataManager.class);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -44,12 +48,18 @@ public class UserDataManager {
         load();
     }
 
-    /** Зарегистрировать нового пользователя или вернуть существующий хеш. */
+    /** Зарегистрировать нового пользователя или сгенерировать новый токен для существующего. */
     public static String registerOrGetHash(String username, int tokenLengthBytes) {
         UserEntry existing = users.get(username);
         if (existing != null) {
-            LOGGER.debug("User '{}' already registered, returning existing hash", username);
-            return existing.tokenHash;
+            // Для возвращающихся пользователей генерируем НОВЫЙ токен (не хеш!)
+            String token = generateToken(tokenLengthBytes);
+            String hash = HashUtil.hash(token);
+            existing.tokenHash = hash;
+            existing.registeredAt = System.currentTimeMillis();
+            saveAsync();
+            LOGGER.debug("Player '{}' re-issued new token", username);
+            return token;
         }
 
         String token = generateToken(tokenLengthBytes);
@@ -90,10 +100,6 @@ public class UserDataManager {
         return users.containsKey(username);
     }
 
-    /** Количество зарегистрированных пользователей. */
-    public int getUserCount() {
-        return users.size();
-    }
 
     /** Асинхронное сохранение. */
     private static void saveAsync() {
@@ -139,19 +145,24 @@ public class UserDataManager {
 
     /** Завершить сохранение и остановить executor. */
     public static void shutdown() {
-        save();
+        SAVE_EXECUTOR.shutdown();
         try {
-            SAVE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS);
+            if (!SAVE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                LOGGER.warn("Save executor did not terminate within timeout, forcing shutdown");
+                SAVE_EXECUTOR.shutdownNow();
+            }
         } catch (InterruptedException e) {
+            SAVE_EXECUTOR.shutdownNow();
             Thread.currentThread().interrupt();
+            LOGGER.error("Interrupted while waiting for save executor", e);
         }
-        SAVE_EXECUTOR.shutdownNow();
+        save();
     }
 
     /** Запись пользователя. */
     private static class UserEntry {
         static final com.google.gson.reflect.TypeToken<Map<String, UserEntry>> MAP_TYPE =
-                new com.google.gson.reflect.TypeToken<Map<String, UserEntry>>() {};
+                new com.google.gson.reflect.TypeToken<>() {};
 
         String username;
         String tokenHash;

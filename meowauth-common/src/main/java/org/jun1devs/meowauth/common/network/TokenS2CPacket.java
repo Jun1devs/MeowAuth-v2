@@ -5,12 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 /**
  * Пакет сервер -> клиент: содержит токен для сохранения на клиенте.
  */
-public class TokenS2CPacket {
-    private final String token;
-
-    public TokenS2CPacket(String token) {
-        this.token = token;
-    }
+public record TokenS2CPacket(String token) {
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeUtf(token, 32767);

@@ -5,14 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 /**
  * Пакет клиент -> сервер: содержит имя пользователя и токен для проверки.
  */
-public class TokenC2SPacket {
-    private final String username;
-    private final String token;
-
-    public TokenC2SPacket(String username, String token) {
-        this.username = username;
-        this.token = token;
-    }
+public record TokenC2SPacket(String username, String token) {
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeUtf(username, 32767);

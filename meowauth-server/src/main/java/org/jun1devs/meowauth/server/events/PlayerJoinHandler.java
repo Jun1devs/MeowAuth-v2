@@ -32,7 +32,7 @@ public class PlayerJoinHandler {
         LOGGER.info("Player '{}' joined, issuing auth token", username);
 
         // Регистрация/получение токена
-        String token = UserDataManager.registerOrGetHash(username, ConfigManager.tokenLength);
+        String token = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
 
         // Отправка токена клиенту
         ServerNetwork.sendTokenToClient(player, token);
@@ -40,7 +40,7 @@ public class PlayerJoinHandler {
         // Сообщение игроку (без показа токена)
         player.sendSystemMessage(Component.literal("§6[MeowAuth] §fAuthentication token issued."));
 
-        if (ConfigManager.debug) {
+        if (ConfigManager.isDebug()) {
             LOGGER.debug("Token issued for '{}' (length: {})", username, token.length());
         }
     }
@@ -52,11 +52,11 @@ public class PlayerJoinHandler {
         LoginAttempt attempt = loginAttempts.get(username);
         if (attempt == null) return false;
 
-        if (attempt.count >= ConfigManager.maxLoginAttempts) {
+        if (attempt.count >= ConfigManager.getMaxLoginAttempts()) {
             long elapsed = Instant.now().getEpochSecond() - attempt.lastAttemptEpoch;
-            if (elapsed < ConfigManager.lockoutDurationSeconds) {
+            if (elapsed < ConfigManager.getLockoutDurationSeconds()) {
                 LOGGER.warn("User '{}' is locked out ({} attempts, {}s remaining)",
-                        username, attempt.count, ConfigManager.lockoutDurationSeconds - elapsed);
+                        username, attempt.count, ConfigManager.getLockoutDurationSeconds() - elapsed);
                 return true;
             } else {
                 // Срок блокировки истёк — сброс

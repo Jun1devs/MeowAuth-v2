@@ -18,6 +18,10 @@ public class ClientNetwork {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientNetwork.class);
 
+    private ClientNetwork() {
+        // Utility class, no instances
+    }
+
     public static final SimpleChannel CHANNEL = NetworkRegistry.ChannelBuilder
             .named(NetworkConstants.CHANNEL_NAME)
             .networkProtocolVersion(() -> NetworkConstants.PROTOCOL_VERSION)

@@ -21,14 +21,25 @@ public class ConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CFG = Path.of("config/meowauth-server.json");
 
+    private ConfigManager() {
+        // Utility class, no instances
+    }
+
     /** Публичные настраиваемые параметры */
-    public static boolean debug = false;
-    public static int tokenLength = 32;
-    public static String dataFile = "config/meowauth_users.json";
-    public static boolean autoSave = true;
-    public static String kickMessage = "§cAuthentication failed: invalid or missing token.";
-    public static int maxLoginAttempts = 5;
-    public static long lockoutDurationSeconds = 300;
+    private static boolean debug = false;
+    private static int tokenLength = 32;
+    private static String dataFile = "config/meowauth_users.json";
+    private static boolean autoSave = true;
+    private static String kickMessage = "§cAuthentication failed: invalid or missing token.";
+    private static int maxLoginAttempts = 5;
+    private static long lockoutDurationSeconds = 300;
+
+    public static boolean isDebug() { return debug; }
+    public static int getTokenLength() { return tokenLength; }
+    public static String getDataFile() { return dataFile; }
+    public static String getKickMessage() { return kickMessage; }
+    public static int getMaxLoginAttempts() { return maxLoginAttempts; }
+    public static long getLockoutDurationSeconds() { return lockoutDurationSeconds; }
 
     public static void load() {
         try {
@@ -41,7 +52,7 @@ public class ConfigManager {
                 ConfigData data = GSON.fromJson(reader, ConfigData.class);
                 if (data != null) {
                     debug = data.debug;
-                    tokenLength = clamp(data.tokenLength, 8, 64);
+                    tokenLength = Math.max(1, Math.min(data.tokenLength, 64));
                     dataFile = coalesce(data.dataFile, dataFile);
                     autoSave = data.autoSave;
                     kickMessage = coalesce(data.kickMessage, kickMessage);
@@ -65,10 +76,6 @@ public class ConfigManager {
         } catch (IOException e) {
             LOGGER.error("Failed to save config", e);
         }
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private static String coalesce(String value, String fallback) {

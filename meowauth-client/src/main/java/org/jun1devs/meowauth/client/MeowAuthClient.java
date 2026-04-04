@@ -1,7 +1,6 @@
 package org.jun1devs.meowauth.client;
 
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.api.distmarker.Dist;
