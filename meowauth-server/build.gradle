@@ -7,6 +7,10 @@ group = mod_group_id
 version = mod_version
 archivesBaseName = 'MeowAuth-Server'
 
+configurations {
+    embeddedLib
+}
+
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
@@ -42,6 +46,8 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     implementation project(':meowauth-common')
+
+    embeddedLib "org.mindrot:jbcrypt:${jbcrypt_version}"
 
     // BCrypt для хеширования паролей
     implementation "org.mindrot:jbcrypt:${jbcrypt_version}"
@@ -88,6 +94,11 @@ processResources {
 jar {
 
     from project(':meowauth-common').sourceSets.main.output
+
+    from {
+        configurations.embeddedLib.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     manifest {
