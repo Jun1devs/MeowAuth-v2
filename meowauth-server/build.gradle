@@ -1,7 +1,6 @@
 plugins {
     id 'java'
     id 'net.minecraftforge.gradle'
-    id 'org.spongepowered.mixin'
 }
 
 group = mod_group_id
@@ -35,11 +34,6 @@ minecraft {
             args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
         }
     }
-}
-
-mixin {
-    add sourceSets.main, "${mod_id}-server.refmap.json"
-    config "${mod_id}-server.mixins.json"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
