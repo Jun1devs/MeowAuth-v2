@@ -56,20 +56,20 @@ public class ServerNetwork {
             String username = pkt.getUsername();
             String token = pkt.getToken();
 
-            // 1. Проверка на блокировку после частых ошибок
+            // 1. Если токен верный -> ПУСКАЕМ И БОЛЬШЕ НИЧЕГО НЕ ДЕЛАЕМ
+            if (UserDataManager.verifyToken(username, token)) {
+                PlayerJoinHandler.resetAttempts(username);
+                LOGGER.info("Player '{}' authenticated successfully (Token valid, no changes).", username);
+                return; // <--- Критически важно: выходим, чтобы не перевыдать токен
+            }
+
+            // 2. Если токен НЕВЕРНЫЙ или ПУСТОЙ
             if (PlayerJoinHandler.isLockedOut(username)) {
                 sender.connection.disconnect(Component.literal("§cToo many failed attempts. Contact an admin."));
                 return;
             }
 
-            // 2. Если токен верный -> разрешаем вход
-            if (UserDataManager.verifyToken(username, token)) {
-                PlayerJoinHandler.resetAttempts(username);
-                LOGGER.info("Player '{}' authenticated successfully", username);
-                return;
-            }
-
-            // 3. Токен неверный или отсутствует
+            //  Токен неверный или отсутствует
             boolean isRegistered = UserDataManager.isRegistered(username);
 
             if (!isRegistered) {
@@ -80,7 +80,7 @@ public class ServerNetwork {
                 return;
             }
 
-            // Игрок СТАРЫЙ, но токен не совпал -> кик
+            // 3. Игрок старый, но токен не подошел -> АВТО-ОБНОВЛЕНИЕ (без кика)
             LOGGER.warn("Token mismatch for '{}'. Auto-refreshing token.", username);
             String refreshedToken = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
             ServerNetwork.sendTokenToClient(sender, refreshedToken);
