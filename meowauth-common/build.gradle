@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle'
+}
+
+group = mod_group_id
+version = mod_version
+
+archivesBaseName = 'MeowAuth-Common'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+    withSourcesJar()
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.minecraftforge.net/' }
+}
+
+dependencies {
+    // Forge — нужен для ResourceLocation, FriendlyByteBuf и т.д.
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // BCrypt для хеширования
+    implementation "org.mindrot:jbcrypt:${jbcrypt_version}"
+
+    // Gson для JSON
+    implementation 'com.google.code.gson:gson:2.13.1'
+
+    // SLF4J (предоставляется Forge, но для компиляции нужен compileOnly)
+    compileOnly 'org.slf4j:slf4j-api:1.7.36'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}
+
+jar {
+    manifest {
+        attributes(
+                'Specification-Title'   : mod_name + ' Common',
+                'Specification-Vendor'  : mod_authors,
+                'Specification-Version' : '1',
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor' : mod_authors,
+        )
+    }
+    finalizedBy 'reobfJar'
+}

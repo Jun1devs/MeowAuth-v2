@@ -1,0 +1,30 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+issueTrackerURL = "https://github.com/Jun1devs/MeowAuth/issues"
+
+[[mods]]
+modId = "meowauth_client"
+version = "${mod_version}"
+displayName = "${mod_name} Client"
+#updateJSONURL="https://example.com/updates.json"
+displayURL = "https://github.com/Jun1devs/MeowAuth"
+logoFile = "meowauth_logo.png"
+logoBlur = false
+credits = "Jun1devs Team"
+authors = "${mod_authors}"
+description = '''Client-side companion for MeowAuth server authentication. Handles token storage and automatic authentication.'''
+
+[[dependencies.meowauth_client]]
+modId = "forge"
+mandatory = true
+versionRange = "${forge_version_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.meowauth_client]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "CLIENT"

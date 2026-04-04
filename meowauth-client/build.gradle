@@ -1,0 +1,88 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle'
+}
+
+group = mod_group_id
+version = mod_version
+archivesBaseName = 'MeowAuth-Client'
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                meowauth_client {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', 'meowauth_client'
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    implementation project(':meowauth-common')
+
+    // Guava
+    implementation "com.google.guava:guava:${guava_version}"
+
+    // Безопасные версии транзитивных зависимостей
+    implementation "commons-io:commons-io:${commons_io_version}"
+    implementation "io.netty:netty-codec:${netty_version}"
+    implementation "io.netty:netty-handler:${netty_version}"
+    implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
+}
+
+processResources {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : 'meowauth_client',
+            mod_name               : mod_name + ' Client',
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : 'Client-side companion for MeowAuth server authentication.',
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'   : mod_name + ' Client',
+                'Specification-Vendor'  : mod_authors,
+                'Specification-Version' : '1',
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Vendor' : mod_authors,
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
+}

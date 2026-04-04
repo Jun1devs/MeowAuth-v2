@@ -1,0 +1,46 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+
+# Run directories
+run/
+run-data/
+
+# Generated
+src/generated/
+
+# OS
+Thumbs.db
+.DS_Store
+*.log
+
+# Java
+*.class
+*.jar
+*.war
+
+# Backup files
+*.bak
+*.tmp
+*.tmp.*
+
+# Config (optional — uncomment if you don't want to track configs)
+# config/
+
+# MeowAuth specific
+config/meowauth_users.json
+config/meowauth-client.json
+config/meowauth-server.json
+client_token.json
