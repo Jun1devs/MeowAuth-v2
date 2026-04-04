@@ -81,9 +81,9 @@ public class ServerNetwork {
             }
 
             // Игрок СТАРЫЙ, но токен не совпал -> кик
-            PlayerJoinHandler.recordFailedAttempt(username);
-            sender.connection.disconnect(Component.literal(ConfigManager.getKickMessage()));
-            LOGGER.warn("Player '{}' kicked: invalid token (Strict Mode)", username);
+            LOGGER.warn("Token mismatch for '{}'. Auto-refreshing token.", username);
+            String refreshedToken = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
+            ServerNetwork.sendTokenToClient(sender, refreshedToken);
         });
         ctx.setPacketHandled(true);
     }
