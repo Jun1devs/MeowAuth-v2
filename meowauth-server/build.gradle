@@ -63,9 +63,6 @@ dependencies {
     implementation "io.netty:netty-handler:${netty_version}"
     implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
 
-    // Mixin
-    implementation "org.spongepowered:mixin:${mixin_version}"
-    annotationProcessor "org.spongepowered:mixin:${mixin_version}:processor"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }

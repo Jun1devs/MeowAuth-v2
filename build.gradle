@@ -6,7 +6,6 @@ buildscript {
     }
     dependencies {
         classpath "net.minecraftforge.gradle:ForgeGradle:6.0.52"
-        classpath "org.spongepowered:mixingradle:${mixingradle_version}"
     }
 }
 
