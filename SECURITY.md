@@ -17,7 +17,7 @@ We only provide security updates for the latest major release. Please upgrade be
 
 Instead, use one of these secure channels:
 1. **GitHub Security Advisories** (Recommended): Go to the [Security tab](https://github.com/Jun1devs/MeowAuth-v2/security/advisories/new) and click `Report a vulnerability`.
-2. **Direct Email**: If GitHub Advisories aren't available, email us at `[YOUR-EMAIL]@gmail.com` (замените на вашу почту).
+2. **Direct Email**: If GitHub Advisories aren't available, email us at [YOUR-EMAIL](yakushevsergio@gmail.com).
 
 ## 📝 What to Include
 To help us investigate quickly, please provide:
