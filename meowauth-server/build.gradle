@@ -1,6 +1,8 @@
 plugins {
     id 'java'
     id 'net.minecraftforge.gradle'
+    id 'eclipse'
+    id 'idea'
 }
 
 group = mod_group_id
