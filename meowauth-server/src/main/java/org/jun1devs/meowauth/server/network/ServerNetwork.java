@@ -53,37 +53,48 @@ public class ServerNetwork {
             ServerPlayer sender = ctx.getSender();
             if (sender == null) return;
 
-            String username = pkt.getUsername();
+            String packetUsername = pkt.getUsername();
             String token = pkt.getToken();
 
-            // 1. Если токен верный -> ПУСКАЕМ И БОЛЬШЕ НИЧЕГО НЕ ДЕЛАЕМ
-            if (UserDataManager.verifyToken(username, token)) {
-                PlayerJoinHandler.resetAttempts(username);
-                LOGGER.info("Player '{}' authenticated successfully (Token valid, no changes).", username);
-                return; // <--- Критически важно: выходим, чтобы не перевыдать токен
+            // 1. Валидация: имя из пакета должно совпадать с реальным именем игрока
+            String actualUsername = sender.getName().getString();
+            if (!actualUsername.equals(packetUsername)) {
+                LOGGER.warn("Player '{}' sent C2S packet with username '{}', disconnecting",
+                        actualUsername, packetUsername);
+                sender.connection.disconnect(Component.literal("§c[MeowAuth] Username mismatch."));
+                return;
             }
 
-            // 2. Если токен НЕВЕРНЫЙ или ПУСТОЙ
-            if (PlayerJoinHandler.isLockedOut(username)) {
+            // 2. Если токен верный — аутентифицируем и выходим
+            if (!token.isEmpty() && UserDataManager.verifyToken(actualUsername, token)) {
+                PlayerJoinHandler.resetAttempts(actualUsername);
+                PlayerJoinHandler.markAuthenticated(actualUsername);
+                LOGGER.info("Player '{}' authenticated successfully.", actualUsername);
+                return;
+            }
+
+            // 3. Токен неверный или отсутствует
+            if (PlayerJoinHandler.isLockedOut(actualUsername)) {
                 sender.connection.disconnect(Component.literal("§cToo many failed attempts. Contact an admin."));
                 return;
             }
 
-            //  Токен неверный или отсутствует
-            boolean isRegistered = UserDataManager.isRegistered(username);
+            boolean isRegistered = UserDataManager.isRegistered(actualUsername);
 
             if (!isRegistered) {
-                // Игрок НОВЫЙ -> регистрируем и выдаём токен
-                String newToken = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
+                // Игрок НОВЫЙ — но PlayerJoinHandler уже должен был его зарегистрировать.
+                // На случай если C2S пришёл раньше: регистрируем сейчас.
+                PlayerJoinHandler.recordFailedAttempt(actualUsername);
+                String newToken = UserDataManager.registerNewUser(actualUsername, ConfigManager.getTokenLength());
                 ServerNetwork.sendTokenToClient(sender, newToken);
-                LOGGER.info("New player '{}' registered and issued token automatically.", username);
+                PlayerJoinHandler.markAuthenticated(actualUsername);
+                LOGGER.info("New player '{}' registered and issued token via C2S.", actualUsername);
                 return;
             }
 
-            // 3. Игрок старый, но токен не подошел -> АВТО-ОБНОВЛЕНИЕ (без кика)
-            LOGGER.warn("Token mismatch for '{}'. Auto-refreshing token.", username);
-            String refreshedToken = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
-            ServerNetwork.sendTokenToClient(sender, refreshedToken);
+            // 4. Игрок старый, но токен не подошёл — записываем неудачную попытку
+            PlayerJoinHandler.recordFailedAttempt(actualUsername);
+            LOGGER.warn("Token mismatch for '{}'. Awaiting server-side re-issue on next join.", actualUsername);
         });
         ctx.setPacketHandled(true);
     }

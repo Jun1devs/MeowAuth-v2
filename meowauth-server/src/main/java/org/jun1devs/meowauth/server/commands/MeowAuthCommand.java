@@ -8,7 +8,9 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.GameProfileArgument;
 import net.minecraft.network.chat.Component;
 import org.jun1devs.meowauth.common.UserDataManager;
+import org.jun1devs.meowauth.server.ConfigManager;
 import org.jun1devs.meowauth.server.events.PlayerJoinHandler;
+import org.jun1devs.meowauth.server.network.ServerNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,17 +36,36 @@ public class MeowAuthCommand {
 
     private static int resetPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         Collection<com.mojang.authlib.GameProfile> targets = GameProfileArgument.getGameProfiles(ctx, "targets");
+        int refreshed = 0;
 
         for (com.mojang.authlib.GameProfile profile : targets) {
             String username = profile.getName();
             if (username == null || username.isBlank()) continue;
 
-            UserDataManager.removeUser(username);
+            if (!UserDataManager.isRegistered(username)) {
+                ctx.getSource().sendFailure(Component.literal("§c[MeowAuth] Игрок §e" + username + "§c не зарегистрирован."));
+                continue;
+            }
+
+            String newToken = UserDataManager.refreshToken(username, ConfigManager.getTokenLength());
             PlayerJoinHandler.resetAttempts(username);
 
-            LOGGER.info("Admin reset player '{}'. They will get a new token on next join.", username);
-            ctx.getSource().sendSuccess(() -> Component.literal("§a[MeowAuth] Игрок §e" + username + " §a сброшен. При входе получит новый токен."), true);
+            if (newToken != null) {
+                // Если игрок онлайн — сразу отправляем новый токен
+                var server = ctx.getSource().getServer();
+                var player = server.getPlayerList().getPlayer(profile.getId());
+                if (player != null) {
+                    ServerNetwork.sendTokenToClient(player, newToken);
+                }
+                LOGGER.info("Admin reset player '{}'. New token issued.", username);
+                ctx.getSource().sendSuccess(() -> Component.literal("§a[MeowAuth] Токен для §e" + username + "§a обновлён."), true);
+                refreshed++;
+            }
         }
-        return 1;
+
+        if (refreshed == 0) {
+            ctx.getSource().sendFailure(Component.literal("§c[MeowAuth] Не удалось обновить токены."));
+        }
+        return refreshed;
     }
 }

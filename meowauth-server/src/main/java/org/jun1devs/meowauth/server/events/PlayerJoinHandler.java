@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Mod.EventBusSubscriber(modid = MeowAuthServer.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
@@ -24,25 +25,44 @@ public class PlayerJoinHandler {
     /** Отслеживание попыток входа: username -> (count, lastAttempt) */
     private static final Map<String, LoginAttempt> loginAttempts = new ConcurrentHashMap<>();
 
+    /** Игроки, уже аутентифицированные в текущей сессии (сбрасывается при выходе). */
+    private static final Set<String> authenticatedPlayers = ConcurrentHashMap.newKeySet();
+
     @SubscribeEvent
     public static void onJoin(PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         String username = player.getName().getString();
-        LOGGER.info("Player '{}' joined, issuing auth token", username);
 
-        // Регистрация/получение токена
-        String token = UserDataManager.registerOrGetHash(username, ConfigManager.getTokenLength());
+        // Если игрок уже аутентифицирован через C2S-пакет — ничего не делаем
+        if (authenticatedPlayers.contains(username)) {
+            LOGGER.debug("Player '{}' already authenticated via C2S, skipping", username);
+            return;
+        }
 
-        // Отправка токена клиенту
+        // Если игрок уже зарегистрирован — ждём C2S-пакет от клиента
+        if (UserDataManager.isRegistered(username)) {
+            LOGGER.debug("Player '{}' is registered, awaiting C2S token packet", username);
+            return;
+        }
+
+        // Новый игрок — регистрируем и выдаём токен
+        LOGGER.info("New player '{}' joined, registering and issuing auth token", username);
+        String token = UserDataManager.registerNewUser(username, ConfigManager.getTokenLength());
         ServerNetwork.sendTokenToClient(player, token);
-
-        // Сообщение игроку (без показа токена)
         player.sendSystemMessage(Component.literal("§6[MeowAuth] §fAuthentication token issued."));
+        authenticatedPlayers.add(username);
 
         if (ConfigManager.isDebug()) {
-            LOGGER.debug("Token issued for '{}' (length: {})", username, token.length());
+            LOGGER.debug("Token issued for new player '{}' (length: {})", username, token.length());
         }
+    }
+
+    /**
+     * Отметить игрока как аутентифицированного (вызывается из ServerNetwork).
+     */
+    public static void markAuthenticated(String username) {
+        authenticatedPlayers.add(username);
     }
 
     /**

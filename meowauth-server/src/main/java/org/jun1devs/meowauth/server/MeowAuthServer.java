@@ -20,7 +20,7 @@ public class MeowAuthServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(MeowAuthServer.class);
 
     public MeowAuthServer() {
-        LOGGER.info("MeowAuth Server v{} initializing...", "2.0.0");
+        LOGGER.info("MeowAuth Server v{} initializing...", "2.0.2");
 
         // Подписка на события инициализации
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onCommonSetup);

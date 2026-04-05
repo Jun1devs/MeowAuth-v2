@@ -48,26 +48,29 @@ public class UserDataManager {
         load();
     }
 
-    /** Зарегистрировать нового пользователя или сгенерировать новый токен для существующего. */
-    public static String registerOrGetHash(String username, int tokenLengthBytes) {
-        UserEntry existing = users.get(username);
-        if (existing != null) {
-            // Для возвращающихся пользователей генерируем НОВЫЙ токен (не хеш!)
-            String token = generateToken(tokenLengthBytes);
-            String hash = HashUtil.hash(token);
-            existing.tokenHash = hash;
-            existing.registeredAt = System.currentTimeMillis();
-            saveAsync();
-            LOGGER.debug("Player '{}' re-issued new token", username);
-            return token;
-        }
-
+    /** Зарегистрировать нового пользователя (генерирует токен). */
+    public static String registerNewUser(String username, int tokenLengthBytes) {
         String token = generateToken(tokenLengthBytes);
         String hash = HashUtil.hash(token);
         UserEntry entry = new UserEntry(username, hash, System.currentTimeMillis());
         users.put(username, entry);
         saveAsync();
         LOGGER.info("Registered new user '{}'", username);
+        return token;
+    }
+
+    /** Обновить токен существующего пользователя (админский reset). */
+    public static String refreshToken(String username, int tokenLengthBytes) {
+        UserEntry existing = users.get(username);
+        if (existing == null) {
+            LOGGER.warn("Cannot refresh token for unregistered user '{}'", username);
+            return null;
+        }
+        String token = generateToken(tokenLengthBytes);
+        existing.tokenHash = HashUtil.hash(token);
+        existing.registeredAt = System.currentTimeMillis();
+        saveAsync();
+        LOGGER.info("Refreshed token for user '{}'", username);
         return token;
     }
 

@@ -20,7 +20,7 @@ public class MeowAuthClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(MeowAuthClient.class);
 
     public MeowAuthClient() {
-        LOGGER.info("MeowAuth Client v2.0.1 initializing...");
+        LOGGER.info("MeowAuth Client v{} initializing...", "2.0.2");
 
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onCommonSetup);
 

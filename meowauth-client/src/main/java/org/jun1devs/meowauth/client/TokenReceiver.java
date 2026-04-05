@@ -14,6 +14,10 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.DosFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 @OnlyIn(Dist.CLIENT)
 public class TokenReceiver {
@@ -44,6 +48,7 @@ public class TokenReceiver {
             try (Writer writer = Files.newBufferedWriter(TOKEN_FILE)) {
                 GSON.toJson(json, writer);
             }
+            restrictFilePermissions(TOKEN_FILE);
             cachedToken = token;
             LOGGER.debug("Token saved to {}", TOKEN_FILE);
         } catch (IOException e) {
@@ -88,6 +93,35 @@ public class TokenReceiver {
         } catch (IOException e) {
             LOGGER.error("Failed to clear token", e);
             return false;
+        }
+    }
+
+    /**
+     * Ограничить права доступа к файлу токена — только владелец.
+     * На POSIX: chmod 600 (rw-------).
+     * На Windows: убираем атрибуты чтения для всех, ставим hidden.
+     */
+    private static void restrictFilePermissions(Path path) {
+        try {
+            // POSIX-системы (Linux, macOS)
+            if (Files.getFileStore(path).supportsFileAttributeView("posix")) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rw-------");
+                Files.setPosixFilePermissions(path, perms);
+                LOGGER.debug("Set POSIX permissions to rw------- for {}", path);
+            }
+            // Windows — ставим атрибут «скрытый» и убираем «только чтение»
+            else if (Files.getFileStore(path).supportsFileAttributeView("dos")) {
+                DosFileAttributeView dosView = Files.getFileAttributeView(path, DosFileAttributeView.class);
+                if (dosView != null) {
+                    dosView.setHidden(true);
+                    dosView.setReadOnly(false);
+                    LOGGER.debug("Set Windows hidden attribute for {}", path);
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Could not restrict file permissions for {}: {}", path, e.getMessage());
+        } catch (UnsupportedOperationException e) {
+            LOGGER.debug("File attribute views not supported for {}, skipping permission restriction", path);
         }
     }
 }
