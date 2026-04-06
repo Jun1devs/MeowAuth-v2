@@ -43,4 +43,11 @@ Thumbs.db
 config/meowauth_users.json
 config/meowauth-client.json
 config/meowauth-server.json
+config/meowauth_lockouts.json
 client_token.json
+
+# MeowAuth server run artifacts
+meowauth-server/logs/
+meowauth-server/config/
+meowauth-server/run/
+meowauth-server/run-data/

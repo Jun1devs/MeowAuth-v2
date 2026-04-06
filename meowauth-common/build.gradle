@@ -30,9 +30,6 @@ dependencies {
     // Forge — нужен для ResourceLocation, FriendlyByteBuf и т.д.
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // BCrypt для хеширования
-    implementation "org.mindrot:jbcrypt:${jbcrypt_version}"
-
     // Gson для JSON
     implementation 'com.google.code.gson:gson:2.13.2'
 
@@ -56,5 +53,4 @@ jar {
                 'Implementation-Vendor' : mod_authors,
         )
     }
-    finalizedBy 'reobfJar'
 }

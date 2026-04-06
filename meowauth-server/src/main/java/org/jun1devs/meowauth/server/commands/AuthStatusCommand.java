@@ -7,8 +7,9 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import org.jun1devs.meowauth.common.UserDataManager;
-import org.jun1devs.meowauth.server.events.PlayerJoinHandler;
+import org.jun1devs.meowauth.server.MeowColors;
+import org.jun1devs.meowauth.server.data.UserDataManager;
+import org.jun1devs.meowauth.server.data.LockoutManager;
 
 /**
  * Команда /authstatus — показывает статус аутентификации игрока.
@@ -21,6 +22,7 @@ public class AuthStatusCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("authstatus")
+                .requires(src -> src.hasPermission(0)) // Any player can check their own status
                 .executes(AuthStatusCommand::run)
         );
     }
@@ -30,14 +32,14 @@ public class AuthStatusCommand {
         String username = player.getName().getString();
 
         boolean registered = UserDataManager.isRegistered(username);
-        boolean lockedOut = PlayerJoinHandler.isLockedOut(username);
+        boolean lockedOut = LockoutManager.isLockedOut(username);
 
         if (lockedOut) {
-            player.sendSystemMessage(Component.literal("§c[MeowAuth] Вы заблокированы. Подождите перед следующей попыткой."));
+            player.sendSystemMessage(Component.literal(MeowColors.RED + MeowColors.PREFIX + "You are locked out. Wait before trying again."));
         } else if (registered) {
-            player.sendSystemMessage(Component.literal("§a[MeowAuth] Вы зарегистрированы и аутентифицированы."));
+            player.sendSystemMessage(Component.literal(MeowColors.GREEN + MeowColors.PREFIX + "You are registered and authenticated."));
         } else {
-            player.sendSystemMessage(Component.literal("§e[MeowAuth] Вы не зарегистрированы. Токен будет выдан при следующем подключении."));
+            player.sendSystemMessage(Component.literal(MeowColors.YELLOW + MeowColors.PREFIX + "You are not registered. A token will be issued on next join."));
         }
 
         return 1;

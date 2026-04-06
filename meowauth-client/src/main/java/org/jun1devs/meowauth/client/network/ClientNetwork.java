@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class ClientNetwork {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientNetwork.class);
-    private static boolean hasSentInitialPacket = false;
+    private static volatile boolean hasSentInitialPacket = false;
 
 
     private ClientNetwork() {
@@ -30,11 +30,10 @@ public class ClientNetwork {
             .serverAcceptedVersions(NetworkConstants.PROTOCOL_VERSION::equals)
             .simpleChannel();
 
-    @OnlyIn(Dist.CLIENT)
     public static void register() {
         LOGGER.info("Registering client network channels");
 
-        // 1. Обработка получения токена от сервера (S2C)
+        // Handle token reception from server (S2C)
         CHANNEL.messageBuilder(TokenS2CPacket.class, NetworkConstants.S2C_TOKEN_PACKET_ID)
                 .encoder(TokenS2CPacket::encode)
                 .decoder(TokenS2CPacket::decode)
@@ -45,23 +44,16 @@ public class ClientNetwork {
                     ctxSupplier.get().setPacketHandled(true);
                 })
                 .add();
-
-        // 2. Пустой обработчик для C2S (клиент не принимает свои же пакеты)
-        CHANNEL.messageBuilder(TokenC2SPacket.class, NetworkConstants.C2S_TOKEN_PACKET_ID)
-                .encoder(TokenC2SPacket::encode)
-                .decoder(TokenC2SPacket::decode)
-                .consumerMainThread((pkt, ctxSupplier) -> ctxSupplier.get().setPacketHandled(true))
-                .add();
     }
 
-    // 3. МЕТОД-ОБРАБОТЧИК: Срабатывает, когда игрок ЗАХОДИТ на сервер
+    /** Send initial auth packet when player logs in. */
     @OnlyIn(Dist.CLIENT)
     public static void onPlayerLogin(ClientPlayerNetworkEvent.LoggingIn event) {
-        if (hasSentInitialPacket) return; // Защита от повторной отправки
+        if (hasSentInitialPacket) return; // Prevent duplicate sends
 
         String playerName = event.getPlayer().getName().getString();
         String savedToken = TokenReceiver.loadToken();
-        // Если токена нет, шлем пустую строку (сервер кикнет, если игрок уже был в базе)
+        // If no token saved, send empty string (server will kick if player is already registered)
         String tokenToSend = (savedToken != null && !savedToken.isBlank()) ? savedToken : "";
 
         CHANNEL.sendToServer(new TokenC2SPacket(playerName, tokenToSend));
@@ -70,7 +62,7 @@ public class ClientNetwork {
         hasSentInitialPacket = true;
     }
 
-    // 4. МЕТОД-ОБРАБОТЧИК: Срабатывает при ВЫХОДЕ (сбрасываем флаг)
+    /** Reset flag when player logs out. */
     @OnlyIn(Dist.CLIENT)
     public static void onPlayerLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         hasSentInitialPacket = false;

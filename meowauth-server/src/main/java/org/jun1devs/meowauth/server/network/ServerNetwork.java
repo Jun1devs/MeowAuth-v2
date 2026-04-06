@@ -9,9 +9,12 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import org.jun1devs.meowauth.common.network.NetworkConstants;
 import org.jun1devs.meowauth.common.network.TokenC2SPacket;
 import org.jun1devs.meowauth.common.network.TokenS2CPacket;
-import org.jun1devs.meowauth.common.UserDataManager;
+import org.jun1devs.meowauth.server.MeowColors;
+import org.jun1devs.meowauth.server.data.UserDataManager;
+import org.jun1devs.meowauth.server.data.LockoutManager;
 import org.jun1devs.meowauth.server.ConfigManager;
 import org.jun1devs.meowauth.server.events.PlayerJoinHandler;
+import org.jun1devs.meowauth.server.security.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +22,12 @@ import java.util.function.Supplier;
 
 public class ServerNetwork {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerNetwork.class);
+
+    /** Minecraft username max length. */
+    private static final int MAX_USERNAME_LENGTH = 16;
+
+    /** Dummy token for timing-attack prevention (takes ~300ms at BCrypt cost 12). */
+    private static final String DUMMY_TOKEN = "dummy-timing-prevention-token-12345";
 
     private ServerNetwork() {
         // Utility class, no instances
@@ -39,12 +48,6 @@ public class ServerNetwork {
                 .decoder(TokenC2SPacket::decode)
                 .consumerMainThread(ServerNetwork::handleTokenC2S)
                 .add();
-
-        CHANNEL.messageBuilder(TokenS2CPacket.class, NetworkConstants.S2C_TOKEN_PACKET_ID)
-                .encoder(TokenS2CPacket::encode)
-                .decoder(TokenS2CPacket::decode)
-                .consumerMainThread((pkt, ctxSupplier) -> ctxSupplier.get().setPacketHandled(true))
-                .add();
     }
 
     private static void handleTokenC2S(TokenC2SPacket pkt, Supplier<NetworkEvent.Context> ctxSupplier) {
@@ -56,49 +59,77 @@ public class ServerNetwork {
             String packetUsername = pkt.getUsername();
             String token = pkt.getToken();
 
-            // 1. Валидация: имя из пакета должно совпадать с реальным именем игрока
+            // 1. Validate username length (Minecraft limit = 16 chars)
+            if (packetUsername == null || packetUsername.length() > MAX_USERNAME_LENGTH) {
+                LOGGER.warn("Player sent invalid username length: '{}', disconnecting", packetUsername);
+                sender.connection.disconnect(Component.literal(MeowColors.RED + MeowColors.PREFIX + "Invalid username."));
+                return;
+            }
+
+            // 2. Validate: packet username must match actual player username
             String actualUsername = sender.getName().getString();
             if (!actualUsername.equals(packetUsername)) {
                 LOGGER.warn("Player '{}' sent C2S packet with username '{}', disconnecting",
                         actualUsername, packetUsername);
-                sender.connection.disconnect(Component.literal("§c[MeowAuth] Username mismatch."));
+                sender.connection.disconnect(Component.literal(MeowColors.RED + MeowColors.PREFIX + "Username mismatch."));
                 return;
             }
 
-            // 2. Если токен верный — аутентифицируем и выходим
-            if (!token.isEmpty() && UserDataManager.verifyToken(actualUsername, token)) {
-                PlayerJoinHandler.resetAttempts(actualUsername);
+            // 2. Timing-safe authentication: ALWAYS perform exactly one BCrypt operation
+            //    to prevent username enumeration via timing.
+            boolean authenticated;
+            if (!token.isEmpty() && UserDataManager.isRegistered(actualUsername)) {
+                // Path A: user exists, token exists → verify (BCrypt checkpw)
+                authenticated = UserDataManager.verifyToken(actualUsername, token);
+            } else if (!token.isEmpty()) {
+                // Path B: user NOT found, but token is non-empty → dummy hash
+                //    (takes ~300ms, same as real verify)
+                HashUtil.hash(DUMMY_TOKEN);
+                authenticated = false;
+            } else {
+                // Path C: empty token → dummy hash for unknown users
+                HashUtil.hash(DUMMY_TOKEN);
+                authenticated = false;
+            }
+
+            if (authenticated) {
+                LockoutManager.resetAttempts(actualUsername);
                 PlayerJoinHandler.markAuthenticated(actualUsername);
                 LOGGER.info("Player '{}' authenticated successfully.", actualUsername);
                 return;
             }
 
-            // 3. Токен неверный или отсутствует
-            if (PlayerJoinHandler.isLockedOut(actualUsername)) {
-                sender.connection.disconnect(Component.literal("§cToo many failed attempts. Contact an admin."));
+            // 3. Token incorrect or missing
+            if (LockoutManager.isLockedOut(actualUsername)) {
+                sender.connection.disconnect(Component.literal(MeowColors.RED + "Too many failed attempts. Contact an admin."));
                 return;
             }
 
+            // 4. Player not registered — issue token
             boolean isRegistered = UserDataManager.isRegistered(actualUsername);
-
             if (!isRegistered) {
-                // Игрок НОВЫЙ — но PlayerJoinHandler уже должен был его зарегистрировать.
-                // На случай если C2S пришёл раньше: регистрируем сейчас.
-                PlayerJoinHandler.recordFailedAttempt(actualUsername);
-                String newToken = UserDataManager.registerNewUser(actualUsername, ConfigManager.getTokenLength());
-                ServerNetwork.sendTokenToClient(sender, newToken);
-                PlayerJoinHandler.markAuthenticated(actualUsername);
-                LOGGER.info("New player '{}' registered and issued token via C2S.", actualUsername);
+                String newToken = UserDataManager.getOrRegisterUser(actualUsername, ConfigManager.getTokenLength());
+                if (newToken != null) {
+                    ServerNetwork.sendTokenToClient(sender, newToken);
+                    PlayerJoinHandler.markAuthenticated(actualUsername);
+                    LOGGER.info("New player '{}' registered via C2S fallback and issued token.", actualUsername);
+                }
                 return;
             }
 
-            // 4. Игрок старый, но токен не подошёл — записываем неудачную попытку
-            PlayerJoinHandler.recordFailedAttempt(actualUsername);
+            // 5. Existing player, token mismatch — record failed attempt
+            LockoutManager.recordFailedAttempt(actualUsername);
             LOGGER.warn("Token mismatch for '{}'. Awaiting server-side re-issue on next join.", actualUsername);
         });
         ctx.setPacketHandled(true);
     }
 
+    /**
+     * Отправить токен клиенту.
+     * SECURITY NOTE: Токен передаётся в открытом виде. Minecraft использует
+     * шифрование для игровых сессий, но токен остаётся уязвимым при перехвате.
+     * Будущее улучшение: challenge-response механизм или ротация токенов.
+     */
     public static void sendTokenToClient(ServerPlayer player, String token) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new TokenS2CPacket(token));
     }

@@ -31,13 +31,13 @@ minecraft {
         }
 
         server {
-            property 'forge.enabledGameTestNamespaces', mod_id
+            property 'forge.enabledGameTestNamespaces', 'meowauth_server'
             args '--nogui'
         }
 
         data {
             workingDirectory project.file('run-data')
-            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+            args '--mod', 'meowauth_server', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
         }
     }
 }
@@ -54,20 +54,19 @@ dependencies {
     // BCrypt для хеширования паролей
     implementation "org.mindrot:jbcrypt:${jbcrypt_version}"
 
-    // Guava
-    implementation "com.google.guava:guava:${guava_version}"
-
-    // Безопасные версии транзитивных зависимостей
-    implementation "commons-io:commons-io:${commons_io_version}"
-    implementation "org.apache.commons:commons-compress:${commons_compress_version}"
-    implementation "org.apache.commons:commons-lang3:${commons_lang3_version}"
-    implementation "io.netty:netty-codec:${netty_version}"
-    implementation "io.netty:netty-handler:${netty_version}"
-    implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
-
+    // Unit tests
+    testImplementation "org.junit.jupiter:junit-jupiter:${junit_version}"
+    testImplementation "org.mockito:mockito-core:${mockito_version}"
+    testImplementation "org.assertj:assertj-core:${assertj_version}"
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-sourceSets.main.resources { srcDir 'src/generated/resources' }
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
 
 processResources {
     var replaceProperties = [
@@ -85,7 +84,7 @@ processResources {
     ]
     inputs.properties replaceProperties
 
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+    filesMatching(['META-INF/mods.toml']) {
         expand replaceProperties + [project: project]
     }
 }

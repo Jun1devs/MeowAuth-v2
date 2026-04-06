@@ -20,15 +20,17 @@ public class MeowAuthClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(MeowAuthClient.class);
 
     public MeowAuthClient() {
-        LOGGER.info("MeowAuth Client v{} initializing...", "2.0.2");
+        String version = MeowAuthClient.class.getPackage().getImplementationVersion();
+        if (version == null) version = "dev";
+        LOGGER.info("MeowAuth Client v{} initializing...", version);
 
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onCommonSetup);
 
-        // 1. Отправка токена при входе/выходе игрока
+        // Token send on login/logout
         MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingIn e) -> ClientNetwork.onPlayerLogin(e));
         MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> ClientNetwork.onPlayerLogout(e));
 
-        // 2. Обработка клиентских команд (например, /cleartoken)
+        // Handle client-side commands (e.g. /cleartoken)
         MinecraftForge.EVENT_BUS.addListener(this::onClientChat);
 
         DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> () ->
@@ -37,25 +39,25 @@ public class MeowAuthClient {
     }
 
     private void onCommonSetup(FMLCommonSetupEvent event) {
-        // Регистрируем сетевые каналы
+        // Register network channels
         event.enqueueWork(() ->
                 DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> ClientNetwork::register)
         );
     }
 
-    /** Перехватывает команды, начинающиеся с /, чтобы обработать их на клиенте */
+    /** Intercept client-side slash-commands (e.g. /cleartoken). */
     private void onClientChat(ClientChatEvent event) {
         if (event.getMessage().trim().equalsIgnoreCase("/cleartoken")) {
             boolean cleared = TokenReceiver.clearToken();
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
                 mc.player.displayClientMessage(
-                        Component.literal(cleared ? "§a[MeowAuth] Токен удалён." : "§e[MeowAuth] Токен не найден или уже удалён."
+                        Component.literal(cleared ? "§a[MeowAuth] §fToken removed." : "§e[MeowAuth] §fToken not found or already removed."
                         ),
                         false
                 );
             }
-            event.setCanceled(true); // Запрещаем отправку текста в чат серверу
+            event.setCanceled(true); // Prevent sending to server
         }
     }
 }

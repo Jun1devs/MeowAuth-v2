@@ -9,7 +9,6 @@ version = "${mod_version}"
 displayName = "${mod_name} Client"
 #updateJSONURL="https://example.com/updates.json"
 displayURL = "https://github.com/Jun1devs/MeowAuth"
-logoFile = "meowauth_logo.png"
 logoBlur = false
 credits = "Jun1devs Team"
 authors = "${mod_authors}"

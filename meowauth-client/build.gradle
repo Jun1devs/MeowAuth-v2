@@ -9,10 +9,6 @@ group = mod_group_id
 version = mod_version
 archivesBaseName = 'MeowAuth-Client'
 
-configurations {
-    embeddedLib
-}
-
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
@@ -42,17 +38,6 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     implementation project(':meowauth-common')
-
-    implementation 'com.google.code.gson:gson:2.13.2'
-
-    // Guava
-    implementation "com.google.guava:guava:${guava_version}"
-
-    // Безопасные версии транзитивных зависимостей
-    implementation "commons-io:commons-io:${commons_io_version}"
-    implementation "io.netty:netty-codec:${netty_version}"
-    implementation "io.netty:netty-handler:${netty_version}"
-    implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
 }
 
 processResources {
@@ -71,18 +56,13 @@ processResources {
     ]
     inputs.properties replaceProperties
 
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+    filesMatching(['META-INF/mods.toml']) {
         expand replaceProperties + [project: project]
     }
 }
 
 jar {
-
     from project(':meowauth-common').sourceSets.main.output
-
-    from {
-        configurations.embeddedLib.collect { it.isDirectory() ? it : zipTree(it) }
-    }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 

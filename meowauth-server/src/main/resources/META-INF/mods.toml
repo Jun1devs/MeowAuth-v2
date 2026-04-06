@@ -9,7 +9,6 @@ version = "${mod_version}"
 displayName = "${mod_name} Server"
 #updateJSONURL="https://example.com/updates.json"
 displayURL = "https://github.com/Jun1devs/MeowAuth"
-logoFile = "meowauth_logo.png"
 logoBlur = false
 credits = "Jun1devs Team"
 authors = "${mod_authors}"
@@ -27,11 +26,4 @@ modId = "minecraft"
 mandatory = true
 versionRange = "${minecraft_version_range}"
 ordering = "NONE"
-side = "SERVER"
-
-[[dependencies.meowauth_server]]
-modId = "meowlib"
-mandatory = false
-versionRange = "[1.0,)"
-ordering = "AFTER"
 side = "SERVER"

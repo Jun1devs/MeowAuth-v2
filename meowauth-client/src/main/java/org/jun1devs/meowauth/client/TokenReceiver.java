@@ -12,11 +12,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.DosFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Base64;
 import java.util.Set;
 
 @OnlyIn(Dist.CLIENT)
@@ -27,14 +30,18 @@ public class TokenReceiver {
     private static final Path TOKEN_FILE = Path.of("config/meowauth-client.json");
     private static final String KEY_TOKEN = "token";
 
+    /** Simple XOR encoding — prevents casual reading of the token file.
+     *  WARNING: This is NOT encryption. Anyone with the mod JAR can reverse this.
+     *  Its only purpose is to avoid storing tokens in plain text at a glance. */
+    private static final byte[] ENCODING_KEY = "MeowAuth-2026-Token-Encoding".getBytes(StandardCharsets.UTF_8);
+
     private TokenReceiver() {
         // Utility class, no instances
     }
 
     private static String cachedToken = null;
 
-    /** Сохранить токен в файл. */
-    @OnlyIn(Dist.CLIENT)
+    /** Save token to file (XOR-encoded). */
     public static void saveToken(String token) {
         if (token == null || token.isEmpty()) {
             LOGGER.warn("Attempted to save null/empty token");
@@ -43,11 +50,14 @@ public class TokenReceiver {
         try {
             Files.createDirectories(TOKEN_FILE.getParent());
             JsonObject json = new JsonObject();
-            json.addProperty(KEY_TOKEN, token);
+            json.addProperty(KEY_TOKEN, encode(token));
             json.addProperty("savedAt", System.currentTimeMillis());
-            try (Writer writer = Files.newBufferedWriter(TOKEN_FILE)) {
+            // Атомарная запись через .tmp + move
+            Path tempFile = TOKEN_FILE.resolveSibling(TOKEN_FILE.getFileName() + ".tmp");
+            try (Writer writer = Files.newBufferedWriter(tempFile)) {
                 GSON.toJson(json, writer);
             }
+            Files.move(tempFile, TOKEN_FILE, StandardCopyOption.REPLACE_EXISTING);
             restrictFilePermissions(TOKEN_FILE);
             cachedToken = token;
             LOGGER.debug("Token saved to {}", TOKEN_FILE);
@@ -56,8 +66,7 @@ public class TokenReceiver {
         }
     }
 
-    /** Загрузить токен из файла. */
-    @OnlyIn(Dist.CLIENT)
+    /** Load token from file (XOR-decoded). */
     public static String loadToken() {
         if (cachedToken != null) return cachedToken;
 
@@ -69,7 +78,8 @@ public class TokenReceiver {
             try (Reader reader = Files.newBufferedReader(TOKEN_FILE)) {
                 JsonObject json = GSON.fromJson(reader, JsonObject.class);
                 if (json != null && json.has(KEY_TOKEN)) {
-                    cachedToken = json.get(KEY_TOKEN).getAsString();
+                    String obfuscated = json.get(KEY_TOKEN).getAsString();
+                    cachedToken = decode(obfuscated);
                     LOGGER.debug("Token loaded from {}", TOKEN_FILE);
                     return cachedToken;
                 }
@@ -82,8 +92,7 @@ public class TokenReceiver {
         return null;
     }
 
-    /** Удалить сохранённый токен. */
-    @OnlyIn(Dist.CLIENT)
+    /** Clear the saved token. */
     public static boolean clearToken() {
         cachedToken = null;
         try {
@@ -123,5 +132,23 @@ public class TokenReceiver {
         } catch (UnsupportedOperationException e) {
             LOGGER.debug("File attribute views not supported for {}, skipping permission restriction", path);
         }
+    }
+
+    /** XOR-encoding токена (Base64) — предотвращает чтение из файла на беглый взгляд. */
+    private static String encode(String plaintext) {
+        byte[] bytes = plaintext.getBytes(StandardCharsets.UTF_8);
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] ^= ENCODING_KEY[i % ENCODING_KEY.length];
+        }
+        return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    /** Декодирование токена. */
+    private static String decode(String encoded) {
+        byte[] bytes = Base64.getDecoder().decode(encoded);
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] ^= ENCODING_KEY[i % ENCODING_KEY.length];
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

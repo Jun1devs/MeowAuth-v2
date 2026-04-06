@@ -1,8 +1,6 @@
-package org.jun1devs.meowauth.common;
+package org.jun1devs.meowauth.server.security;
 
 import org.mindrot.jbcrypt.BCrypt;
-
-import java.util.regex.Pattern;
 
 /**
  * Утилиты для безопасного хеширования паролей и токенов.
@@ -18,13 +16,10 @@ public final class HashUtil {
     private static final int LOG_ROUNDS = 12;
 
     /** Минимальная длина токена/пароля */
-    public static final int MIN_LENGTH = 6;
+    private static final int MIN_LENGTH = 6;
 
     /** Максимальная длина — защита от DoS */
-    public static final int MAX_LENGTH = 72; // BCrypt limit
-
-    /** Паттерн: хотя бы одна буква и одна цифра */
-    private static final Pattern LETTER_AND_DIGIT = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).+$");
+    private static final int MAX_LENGTH = 72; // BCrypt limit
 
     /**
      * Хеширует токен/пароль через BCrypt.
@@ -44,9 +39,9 @@ public final class HashUtil {
     }
 
     /**
-     * Валидация токена/пароля.
+     * Валидация токена/пароля (внутренний метод).
      */
-    public static void validate(String token) {
+    private static void validate(String token) {
         if (token == null || token.isEmpty()) {
             throw new IllegalArgumentException("Token must not be empty");
         }
@@ -56,12 +51,5 @@ public final class HashUtil {
         if (token.length() > MAX_LENGTH) {
             throw new IllegalArgumentException("Token too long (max " + MAX_LENGTH + ")");
         }
-    }
-
-    /**
-     * Проверяет, что строка содержит хотя бы одну букву и цифру.
-     */
-    public static boolean hasLetterAndDigit(String token) {
-        return token != null && LETTER_AND_DIGIT.matcher(token).matches();
     }
 }

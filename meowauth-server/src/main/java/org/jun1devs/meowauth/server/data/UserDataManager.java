@@ -1,8 +1,10 @@
-package org.jun1devs.meowauth.common;
+package org.jun1devs.meowauth.server.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
+import org.jun1devs.meowauth.server.ConfigManager;
+import org.jun1devs.meowauth.server.security.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,10 +54,14 @@ public class UserDataManager {
     public static String registerNewUser(String username, int tokenLengthBytes) {
         String token = generateToken(tokenLengthBytes);
         String hash = HashUtil.hash(token);
-        UserEntry entry = new UserEntry(username, hash, System.currentTimeMillis());
+        long expiresAt = ConfigManager.getTokenExpirySeconds() > 0
+                ? System.currentTimeMillis() + ConfigManager.getTokenExpirySeconds() * 1000
+                : 0;
+        UserEntry entry = new UserEntry(username, hash, System.currentTimeMillis(), expiresAt);
         users.put(username, entry);
         saveAsync();
-        LOGGER.info("Registered new user '{}'", username);
+        LOGGER.info("Registered new user '{}' (token expires: {})", username,
+                expiresAt > 0 ? new java.util.Date(expiresAt) : "never");
         return token;
     }
 
@@ -69,6 +75,9 @@ public class UserDataManager {
         String token = generateToken(tokenLengthBytes);
         existing.tokenHash = HashUtil.hash(token);
         existing.registeredAt = System.currentTimeMillis();
+        existing.tokenExpiresAt = ConfigManager.getTokenExpirySeconds() > 0
+                ? System.currentTimeMillis() + ConfigManager.getTokenExpirySeconds() * 1000
+                : 0;
         saveAsync();
         LOGGER.info("Refreshed token for user '{}'", username);
         return token;
@@ -79,6 +88,11 @@ public class UserDataManager {
         UserEntry entry = users.get(username);
         if (entry == null) {
             LOGGER.warn("User '{}' not found", username);
+            return false;
+        }
+        // Check token expiry
+        if (entry.tokenExpiresAt > 0 && System.currentTimeMillis() > entry.tokenExpiresAt) {
+            LOGGER.warn("Token expired for user '{}'", username);
             return false;
         }
         boolean valid = HashUtil.verify(token, entry.tokenHash);
@@ -103,10 +117,46 @@ public class UserDataManager {
         return users.containsKey(username);
     }
 
+    /** Atomically get or register a user (race condition protection). */
+    public static String getOrRegisterUser(String username, int tokenLengthBytes) {
+        // First try fast path — check if already exists
+        if (users.containsKey(username)) {
+            return null;
+        }
+        // Build entry outside of any lock
+        String token = generateToken(tokenLengthBytes);
+        String hash = HashUtil.hash(token);
+        long expiresAt = ConfigManager.getTokenExpirySeconds() > 0
+                ? System.currentTimeMillis() + ConfigManager.getTokenExpirySeconds() * 1000
+                : 0;
+        UserEntry entry = new UserEntry(username, hash, System.currentTimeMillis(), expiresAt);
+
+        // Atomic insert — only if absent
+        UserEntry existing = users.putIfAbsent(username, entry);
+        if (existing == null) {
+            // We were first — save synchronously to guarantee persistence
+            save();
+            LOGGER.info("Race-safe registered new user '{}' (token expires: {})", username,
+                    expiresAt > 0 ? new java.util.Date(expiresAt) : "never");
+            return token;
+        }
+        // Lost the race — another thread registered first
+        return null;
+    }
 
     /** Асинхронное сохранение. */
     private static void saveAsync() {
-        SAVE_EXECUTOR.submit(UserDataManager::save);
+        if (ConfigManager.isAutoSave() && !SAVE_EXECUTOR.isShutdown()) {
+            SAVE_EXECUTOR.submit(UserDataManager::save);
+        }
+    }
+
+    /** Полностью сбросить состояние (для тестов). */
+    static void reset() {
+        users.clear();
+        dataFile = Path.of("config/meowauth_users.json");
+        // SAVE_EXECUTOR is a daemon thread — won't stop between tests.
+        // If shutdown was called, tests won't be able to save — expected behavior.
     }
 
     /** Синхронное сохранение на диск. */
@@ -148,6 +198,7 @@ public class UserDataManager {
 
     /** Завершить сохранение и остановить executor. */
     public static void shutdown() {
+        save(); // Save first before shutdown
         SAVE_EXECUTOR.shutdown();
         try {
             if (!SAVE_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -159,7 +210,6 @@ public class UserDataManager {
             Thread.currentThread().interrupt();
             LOGGER.error("Interrupted while waiting for save executor", e);
         }
-        save();
     }
 
     /** Запись пользователя. */
@@ -170,14 +220,16 @@ public class UserDataManager {
         String username;
         String tokenHash;
         long registeredAt;
+        long tokenExpiresAt;
 
         @SuppressWarnings("unused")
         UserEntry() {}
 
-        UserEntry(String username, String tokenHash, long registeredAt) {
+        UserEntry(String username, String tokenHash, long registeredAt, long tokenExpiresAt) {
             this.username = username;
             this.tokenHash = tokenHash;
             this.registeredAt = registeredAt;
+            this.tokenExpiresAt = tokenExpiresAt;
         }
     }
 
