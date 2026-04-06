@@ -93,9 +93,15 @@ public class ServerNetwork {
             }
 
             if (authenticated) {
+                // Token rotation: issue a new token to prevent replay attacks
+                String newToken = UserDataManager.rotateToken(actualUsername, ConfigManager.getTokenLength());
+                if (newToken != null) {
+                    sendTokenToClient(sender, newToken);
+                    LOGGER.debug("Issued rotated token for '{}'", actualUsername);
+                }
                 LockoutManager.resetAttempts(actualUsername);
                 PlayerJoinHandler.markAuthenticated(actualUsername);
-                LOGGER.info("Player '{}' authenticated successfully.", actualUsername);
+                LOGGER.info("Player '{}' authenticated successfully (token rotated).", actualUsername);
                 return;
             }
 

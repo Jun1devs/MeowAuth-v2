@@ -83,6 +83,29 @@ public class UserDataManager {
         return token;
     }
 
+    /**
+     * Rotate token after successful authentication.
+     * Generates a new token, replaces the old hash, and saves immediately.
+     * The old token becomes invalid — prevents replay attacks.
+     */
+    public static String rotateToken(String username, int tokenLengthBytes) {
+        UserEntry existing = users.get(username);
+        if (existing == null) {
+            LOGGER.warn("Cannot rotate token for unregistered user '{}'", username);
+            return null;
+        }
+        String newToken = generateToken(tokenLengthBytes);
+        existing.tokenHash = HashUtil.hash(newToken);
+        existing.registeredAt = System.currentTimeMillis();
+        existing.tokenExpiresAt = ConfigManager.getTokenExpirySeconds() > 0
+                ? System.currentTimeMillis() + ConfigManager.getTokenExpirySeconds() * 1000
+                : 0;
+        // Synchronous save — token rotation must persist before returning
+        save();
+        LOGGER.info("Rotated token for user '{}'", username);
+        return newToken;
+    }
+
     /** Проверить токен пользователя. */
     public static boolean verifyToken(String username, String token) {
         UserEntry entry = users.get(username);
@@ -152,7 +175,7 @@ public class UserDataManager {
     }
 
     /** Полностью сбросить состояние (для тестов). */
-    static void reset() {
+    public static void reset() {
         users.clear();
         dataFile = Path.of("config/meowauth_users.json");
         // SAVE_EXECUTOR is a daemon thread — won't stop between tests.

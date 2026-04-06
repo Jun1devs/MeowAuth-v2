@@ -123,7 +123,7 @@ public class LockoutManager {
     }
 
     /** Полностью сбросить состояние (для тестов). */
-    static void reset() {
+    public static void reset() {
         attempts.clear();
     }
 
