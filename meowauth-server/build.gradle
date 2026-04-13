@@ -1,27 +1,31 @@
 plugins {
     id 'java'
-    id 'net.minecraftforge.gradle'
+    id 'net.minecraftforge.gradle' version '[7.0.11,8.0)'
+    id 'net.minecraftforge.jarjar' version '0.2.3'
+    id 'net.minecraftforge.renamer' version '1.0.14'
     id 'eclipse'
     id 'idea'
 }
 
 group = mod_group_id
 version = mod_version
-archivesBaseName = 'MeowAuth-Server'
+base.archivesName = 'MeowAuth-Server'
 
-configurations {
-    embeddedLib
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+    withSourcesJar()
 }
 
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
-    copyIdeResources = true
 
     runs {
         configureEach {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.console.level', 'debug'
+            workingDir.convention layout.projectDirectory.dir('run')
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'debug'
 
             mods {
                 meowauth_server {
@@ -30,29 +34,43 @@ minecraft {
             }
         }
 
-        server {
-            property 'forge.enabledGameTestNamespaces', 'meowauth_server'
+        register('server') {
+            systemProperty 'forge.enabledGameTestNamespaces', 'meowauth_server'
             args '--nogui'
         }
 
-        data {
-            workingDirectory project.file('run-data')
-            args '--mod', 'meowauth_server', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        register('data') {
+            workingDir = layout.projectDirectory.dir('run-data')
+            args '--mod', 'meowauth_server', '--all', '--output', layout.projectDirectory.dir('src/generated/resources/'), '--existing', layout.projectDirectory.dir('src/main/resources/')
         }
     }
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+repositories {
+    maven {
+        name = 'Mavenizer'
+        url = rootProject.layout.projectDirectory.dir('.gradle/mavenizer/repo')
+    }
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+
+configurations {
+    jarJarElements
+}
+
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
 
     implementation project(':meowauth-common')
 
-    embeddedLib "org.mindrot:jbcrypt:${jbcrypt_version}"
-
     // BCrypt для хеширования паролей
-    implementation "org.mindrot:jbcrypt:${jbcrypt_version}"
+    jarJarElements "org.mindrot:jbcrypt:${jbcrypt_version}"
+    compileOnly "org.mindrot:jbcrypt:${jbcrypt_version}"
+    testImplementation "org.mindrot:jbcrypt:${jbcrypt_version}"
 
     // Unit tests
     testImplementation "org.junit.jupiter:junit-jupiter:${junit_version}"
@@ -68,7 +86,7 @@ test {
     }
 }
 
-processResources {
+tasks.named('processResources', ProcessResources) {
     var replaceProperties = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
@@ -82,20 +100,15 @@ processResources {
             mod_authors            : mod_authors,
             mod_description        : mod_description,
     ]
-    inputs.properties replaceProperties
+    inputs.property('replaceProperties', replaceProperties)
 
     filesMatching(['META-INF/mods.toml']) {
         expand replaceProperties + [project: project]
     }
 }
 
-jar {
-
+tasks.named('jar', Jar) {
     from project(':meowauth-common').sourceSets.main.output
-
-    from {
-        configurations.embeddedLib.collect { it.isDirectory() ? it : zipTree(it) }
-    }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
@@ -109,7 +122,31 @@ jar {
                 'Implementation-Vendor' : mod_authors,
         ])
     }
-    finalizedBy 'reobfJar'
+    archiveClassifier = 'slim'
+}
+
+// Renamer: переименовывает jar в SRG-имена для 1.20.1
+renamer.classes(tasks.named('jar', Jar)) {
+    map.from minecraft.dependency.toSrgFile
+    archiveClassifier = 'srg'
+}
+
+// jarJar: включаем BCrypt и common в финальный jar
+jarJar.register() {
+    archiveClassifier = null
+    from project(':meowauth-common').sourceSets.main.output
+    from configurations.jarJarElements
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes([
+                'Specification-Title'   : mod_name + ' Server',
+                'Specification-Vendor'  : mod_authors,
+                'Specification-Version' : '1',
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Vendor' : mod_authors,
+        ])
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {

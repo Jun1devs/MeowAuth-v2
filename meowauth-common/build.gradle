@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-    id 'net.minecraftforge.gradle'
     id 'eclipse'
     id 'idea'
 }
@@ -8,7 +7,7 @@ plugins {
 group = mod_group_id
 version = mod_version
 
-archivesBaseName = 'MeowAuth-Common'
+base.archivesName = 'MeowAuth-Common'
 
 java {
     toolchain {
@@ -17,29 +16,36 @@ java {
     withSourcesJar()
 }
 
-minecraft {
-    mappings channel: mapping_channel, version: mapping_version
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 17
 }
 
 repositories {
+    maven {
+        name = 'Mavenizer'
+        url = rootProject.layout.projectDirectory.dir('.gradle/mavenizer/repo')
+    }
+    maven {
+        name = 'ForgeMaven'
+        url = 'https://maven.minecraftforge.net/'
+    }
+    maven {
+        name = 'MojangLibs'
+        url = 'https://libraries.minecraft.net/'
+    }
     mavenCentral()
-    maven { url = 'https://maven.minecraftforge.net/' }
 }
 
 dependencies {
-    // Forge — нужен для ResourceLocation, FriendlyByteBuf и т.д.
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    // Forge и Minecraft — предоставляются модулем, который зависит от common
+    compileOnly "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
     // Gson для JSON
     implementation 'com.google.code.gson:gson:2.13.2'
 
     // SLF4J (предоставляется Forge, но для компиляции нужен compileOnly)
     compileOnly 'org.slf4j:slf4j-api:1.7.36'
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    options.release = 17
 }
 
 jar {
